@@ -20,8 +20,19 @@ toScale fq = (scale , octave) where
 
 a0 = 440 :: Freq -- base sound : 440Hz (A)
 
-toFreq :: Note -> Freq
-toFreq n = 
+toFreq :: [KeySignature] -> Note -> Freq
+toFreq ks (Note s        Nothing o _ _) = toFreq (applySignature s ks,o)
+toFreq ks (Note s (Just Natural) o _ _) = toFreq (s,o)
+
+applySignature :: Note -> [KeySignature] -> Note
+applySignature 
+
+applySign :: Sign ->  Scale -> Scale
+applySign Natural = id
+applySign Sharp = sharp
+applysign DoubleSharp = sharp.sharp
+applySign Flat = flat
+applySign DoubleFlat = flat.flat
 
 sharp :: Scale -> Scale
 sharp Rest = Rest
@@ -38,9 +49,6 @@ sharp A = AS
 sharp AS = B
 sharp B = C
 
--- double sharp
-sharp2 = sharp.sharp
-
 flat :: Scale -> Scale
 flat Rest = Rest
 flat C = B
@@ -55,8 +63,6 @@ flat GS = G
 flat A = GS
 flat AS = A
 flat B = AS
-
-flat2 = flat.flat
 
 len :: Longth -> [Dot] -> Float
 len l ds = len' l ++ sum (map (\v -> 1/2^v) $take (length ds) [1..])
