@@ -2,10 +2,18 @@
 
 module Quail.GUI where
 
+import SDL (($=))
 import qualified SDL
 import qualified SDL.Image as I
+import SDL.Raw.Video as V
+import Linear (V4(..))
+import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
+import Data.Text (Text)
+import Quial.Types
+
+(width, height) = (600,480)
 
 withSDL :: (MonadIO m) => m a -> m ()
 withSDL op = do
@@ -23,26 +31,34 @@ withWindow title (x, y) op = do
       p = SDL.defaultWindow { SDL.windowInitialSize = z }
       z = SDL.V2 (fromIntegral x) (fromIntegral y)
 
-isContinue :: Maybe SDL.Event -> Bool
-isContinue = maybe True (not . isQuitEvent)
+withRenderer :: (MonadIO m) => SDL.Window -> (SDL.Renderer -> m a) -> m ()
+withRenderer w op = do
+    r <- SDL.createRenderer w (-1) rendererConfig
+    void $ op r
+    SDL.destroyRenderer r
+
+rendererConfig :: SDL.RendererConfig
+rendererConfig = SDL.RendererConfig
+  { SDL.rendererType = SDL.AcceleratedVSyncRenderer
+  , SDL.rendererTargetTexture = False
+  }
 
 startGUI :: IO ()
-startGUI = withSDL $ withWindow "Quail" (width,height) $
-    \w -> do
-        screen <- SDL.getWindowSurface w
-        pixelFormat <- SDL.surfaceFormat screen
+startGUI = withSDL $ withWindow "うずら" (width,height) $
+    \w -> withRenderer w renderLoop
 
-        image <- I.load "imgs/note4.png"
-        surface <- SDL.convertSurface image pixelFormat
+renderLoop r = do
+    events <- SDL.pollEvents
+    let eventlsQPress event = case SDL.eventPayload event of
+            SDL.KeyboardEvent keyEvent -> keyEvent `isEventOn` (SDL.KeycodeQ, SDL.Pressed)
+            _ -> False
+        qPressed = any eventlsQPress events
+    SDL.rendererDrawColor r $= V4 200 200 200 30
+    t <- I.loadTexture r "imgs/note4.png"
+    SDL.clear r
+    SDL.copy r t Nothing Nothing
+    SDL.present r
+    unless qPressed (renderLoop r)
 
-        whileM $
-            isContinue <$> SDL.pollEvent
-            >>= conditionallyRun (draw w screen surface)
-
-        SDL.freeSurface image
-        SDL.freeSurface surface
-        SDL.freeSurface screen
-
-draw :: (MonadIO m) => SDL.Window -> SDL.Surface -> SDL.Surface -> m ()
-draw w s1 s2 = SDL.surfaceBlitScaled s2 Nothing s1 Nothing
-            >> SDL.updateWindowSurface w
+event `isEventOn` (key,mode) = SDL.keyboardEventKeyMotion event == mode
+    && SDL.keysymKeycode (SDL.keyboardEventKeysym event) == key

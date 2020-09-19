@@ -2,16 +2,19 @@ module Quail.Types where
 
 -- 楽譜
 data MusicalScore =
-    GSound [KeySignature] [Bar]
-    | FSound [KeySignature] [Bar]
+    MusicalScore [KeySignature] [(Maybe Clef,Bar)]
     deriving (Eq, Show)
+
+-- 音部記号
+data Clef = GClef | FClef
 
 -- 小節
 type Bar = [Note]
 
 -- 音符
 data Note = Note
-    { scale :: Scale
+    { index :: Int
+    , scale :: Scale
     , sign :: Sign
     , oct :: Octave
     , len :: (Length, [Dot])
@@ -84,3 +87,16 @@ data VariableStrength =
 -- 一時的な音効果
 data TempEffect = Accent | Staccato
     deriving (Eq, Show)
+
+data QuailEvent =
+    Quit
+    | AddKeySignature KeySignature
+    | AddClef Clef
+    | AddNote Scale
+    | MoveUp Note
+    | MoveDown Note
+    | Extend Note
+    | Shorten Note
+    | AddSign Note
+    | AddSlur [Note]
+    | AddTie [Note]
