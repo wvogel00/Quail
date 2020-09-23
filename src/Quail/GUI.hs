@@ -11,7 +11,7 @@ import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Text (Text)
-import Quial.Types
+import Quail.Types
 
 (width, height) = (600,480)
 
@@ -48,17 +48,35 @@ startGUI = withSDL $ withWindow "うずら" (width,height) $
     \w -> withRenderer w renderLoop
 
 renderLoop r = do
-    events <- SDL.pollEvents
-    let eventlsQPress event = case SDL.eventPayload event of
-            SDL.KeyboardEvent keyEvent -> keyEvent `isEventOn` (SDL.KeycodeQ, SDL.Pressed)
-            _ -> False
-        qPressed = any eventlsQPress events
     SDL.rendererDrawColor r $= V4 200 200 200 30
+    event <- dealEvent <$> SDL.pollEvent
     t <- I.loadTexture r "imgs/note4.png"
+    t2 <- I.loadTexture r "imgs/rest4.png"
     SDL.clear r
     SDL.copy r t Nothing Nothing
+    SDL.copy r t2 Nothing Nothing
+    SDL.destroyTexture t
+    SDL.destroyTexture t2
     SDL.present r
-    unless qPressed (renderLoop r)
+    unless (event == Quit) $ renderLoop r
 
-event `isEventOn` (key,mode) = SDL.keyboardEventKeyMotion event == mode
+dealEvent :: Maybe SDL.Event -> QuailEvent
+dealEvent Nothing = NotImplemented
+dealEvent (Just e) = case SDL.eventPayload e of
+    SDL.KeyboardEvent keyEvent -> getEventType keyEvent
+    _ -> NotImplemented
+
+
+
+addNote :: SDL.Renderer -> Scale -> IO SDL.Texture
+addNote r s = I.loadTexture r "imgs/rest4.png"
+
+
+getEventType :: SDL.KeyboardEventData -> QuailEvent
+getEventType event
+    | catchOn event (SDL.KeycodeQ, SDL.Pressed) = Quit
+    | catchOn event (SDL.KeycodeA, SDL.Pressed) = AddNote C
+    | otherwise = NotImplemented
+
+catchOn event (key,mode) = SDL.keyboardEventKeyMotion event == mode
     && SDL.keysymKeycode (SDL.keyboardEventKeysym event) == key

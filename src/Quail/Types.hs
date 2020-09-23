@@ -7,6 +7,7 @@ data MusicalScore =
 
 -- 音部記号
 data Clef = GClef | FClef
+    deriving (Eq, Show)
 
 -- 小節
 type Bar = [Note]
@@ -90,6 +91,7 @@ data TempEffect = Accent | Staccato
 
 data QuailEvent =
     Quit
+    | NotImplemented
     | AddKeySignature KeySignature
     | AddClef Clef
     | AddNote Scale
@@ -100,3 +102,4 @@ data QuailEvent =
     | AddSign Note
     | AddSlur [Note]
     | AddTie [Note]
+    deriving (Eq, Show)
