@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Quail.GUI where
 
@@ -57,18 +58,56 @@ startGUI = do
 
 
 renderLoop audio r = do
+    ts <- loadNoteTextures r
     SDL.rendererDrawColor r $= V4 200 200 200 30
     event <- getEvent <$> SDL.pollEvent
     dealEvent event audio r
-    t <- I.loadTexture r "imgs/note4.png"
-    t2 <- I.loadTexture r "imgs/rest4.png"
+    ts <- loadNoteTextures r
+    --t <- I.loadTexture r "imgs/note4.png"
+    --t2 <- I.loadTexture r "imgs/rest4.png"
+
     SDL.clear r
-    SDL.copy r t Nothing Nothing
-    SDL.copy r t2 Nothing Nothing
-    SDL.destroyTexture t
-    SDL.destroyTexture t2
+    drawNotes r ts [Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}]
+    --SDL.copy r t Nothing Nothing
+    --SDL.copy r t2 Nothing Nothing
+    --SDL.destroyTexture t
+    --SDL.destroyTexture t2
     SDL.present r
     unless (event == Quit) $ renderLoop audio r
+
+loadNoteTextures :: SDL.Renderer -> IO [(Scale, Length, SDL.Texture)]
+loadNoteTextures r = do
+    t1  <- (C,Full,) <$> I.loadTexture r "imgs/notefull.png"
+    t2  <- (C,L2,)  <$> I.loadTexture r "imgs/note2.png"
+    t3  <- (C,L4,) <$> I.loadTexture r "imgs/note4.png"
+    t4  <- (C,L8,) <$> I.loadTexture r "imgs/note8.png"
+    t5  <- (C,L16,) <$> I.loadTexture r "imgs/note16.png"
+    t6  <- (C,L32,) <$> I.loadTexture r "imgs/note32.png"
+    t7  <- (Rest,Full,) <$>I.loadTexture r "imgs/restfull.png"
+    t8  <- (Rest,L2,) <$> I.loadTexture r "imgs/rest2.png"
+    t9  <- (Rest,L4,) <$> I.loadTexture r "imgs/rest4.png"
+    t10 <- (Rest,L8,) <$> I.loadTexture r "imgs/rest8.png"
+    t11 <- (Rest,L16,) <$> I.loadTexture r "imgs/rest16.png"
+    return [t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11]
+
+drawNotes :: SDL.Renderer -> [(Scale, Length, SDL.Texture)] -> [Note] -> IO ()
+drawNotes r ts ns = foldlM_ drawNote (30, 30) ns
+    where
+    drawNote (x,y) n = do
+        SDL.copyEx r (findTexture n ts)
+                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
+                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x y) (SDL.V2 80 80))
+                0
+                Nothing
+                (pure False)
+        return (x+30, y)
+
+foldlM_ f _ [] = return ()
+foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
+
+findTexture :: Note -> [(Scale, Length, SDL.Texture)] -> SDL.Texture
+findTexture _ [(_,_,a)] = a
+findTexture n ((s,l,t):ts) = if scale n == s && fst (len n) == l then t else findTexture n ts
 
 
 getEvent :: Maybe SDL.Event -> QuailEvent

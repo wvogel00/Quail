@@ -16,7 +16,7 @@ noteSound n = []
 sinSamples :: [Int16]
 sinSamples = map f [0..] where
     f :: Int32 -> Int16
-    f n = round (fromIntegral (div maxBound 2 :: Int16) * sin (2*pi*t*freq))
+    f n = round (fromIntegral (div maxBound 2 :: Int16) * sin (2*pi*freq*t))
         where t = fromIntegral n / 48000
     freq = 440
 
