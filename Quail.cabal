@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4db2131b66a1f16b4a9e659f3dc61b209c0855185d3b36d257925f8560eac49c
+-- hash: 81baa1866ec4b3d1e8476274a484b53d462715b1ee5fdb3d2c0df9a6be99a49e
 
 name:           Quail
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/Quail#readme>
-homepage:       https://github.com/githubuser/Quail#readme
-bug-reports:    https://github.com/githubuser/Quail/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
+description:    Please see the README on GitHub at <https://github.com/wvogel00/Quail#readme>
+homepage:       https://github.com/wvogel00/Quail#readme
+bug-reports:    https://github.com/wvogel00/Quail/issues
+author:         wataru torii
+maintainer:     wtorii@hey.com
+copyright:      2020 W.TORII
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/Quail
+  location: https://github.com/wvogel00/Quail
 
 library
   exposed-modules:
