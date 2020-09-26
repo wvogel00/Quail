@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3c45a5f374516106ad4118402ec4efa9d921b781933e9e0f0b3e7c4317fbdd6f
+-- hash: 4db2131b66a1f16b4a9e659f3dc61b209c0855185d3b36d257925f8560eac49c
 
 name:           Quail
 version:        0.1.0.0
@@ -27,13 +27,24 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Quail
+      Quail.Audio
+      Quail.GUI
+      Quail.Types
+      Quail.Utils
   other-modules:
       Paths_Quail
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , extra
+    , linear >=1.21
+    , process
+    , sdl2 >=2.5.0.0
+    , sdl2-image
+    , text
+    , vector
   default-language: Haskell2010
 
 executable Quail-exe
@@ -46,6 +57,13 @@ executable Quail-exe
   build-depends:
       Quail
     , base >=4.7 && <5
+    , extra
+    , linear >=1.21
+    , process
+    , sdl2 >=2.5.0.0
+    , sdl2-image
+    , text
+    , vector
   default-language: Haskell2010
 
 test-suite Quail-test
@@ -59,4 +77,11 @@ test-suite Quail-test
   build-depends:
       Quail
     , base >=4.7 && <5
+    , extra
+    , linear >=1.21
+    , process
+    , sdl2 >=2.5.0.0
+    , sdl2-image
+    , text
+    , vector
   default-language: Haskell2010

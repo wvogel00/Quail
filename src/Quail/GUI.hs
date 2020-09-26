@@ -34,12 +34,6 @@ withWindow title (x, y) op = do
       p = SDL.defaultWindow { SDL.windowInitialSize = z }
       z = SDL.V2 (fromIntegral x) (fromIntegral y)
 
-withRenderer :: (MonadIO m) => SDL.Window -> (SDL.Renderer -> m a) -> m ()
-withRenderer w op = do
-    r <- SDL.createRenderer w (-1) rendererConfig
-    void $ op r
-    SDL.destroyRenderer r
-
 rendererConfig :: SDL.RendererConfig
 rendererConfig = SDL.RendererConfig
   { SDL.rendererType = SDL.AcceleratedVSyncRenderer
@@ -53,27 +47,24 @@ startGUI = do
         \w -> do
             sampleSound <- newIORef sinSamples
             audio <- openAudio sampleSound
-            putStrLn "audio device loaded"
-            withRenderer w (renderLoop audio)
+            r <- SDL.createRenderer w (-1) rendererConfig
+            ts <- loadNoteTextures r
+            void $ renderLoop audio r ts
+            SDL.destroyRenderer r
 
 
-renderLoop audio r = do
-    ts <- loadNoteTextures r
+renderLoop audio r ts = do
     SDL.rendererDrawColor r $= V4 200 200 200 30
     event <- getEvent <$> SDL.pollEvent
     dealEvent event audio r
-    ts <- loadNoteTextures r
-    --t <- I.loadTexture r "imgs/note4.png"
-    --t2 <- I.loadTexture r "imgs/rest4.png"
-
+    let notes = [Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}]
+    -- draw objects
     SDL.clear r
-    drawNotes r ts [Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}]
-    --SDL.copy r t Nothing Nothing
-    --SDL.copy r t2 Nothing Nothing
-    --SDL.destroyTexture t
-    --SDL.destroyTexture t2
+    drawNotes r ts notes
+    -- mapM_ (SDL.destroyTexture.(\(_,_,t) -> t)) $ ts
     SDL.present r
-    unless (event == Quit) $ renderLoop audio r
+    unless (event == Quit) $ renderLoop audio r ts
+
 
 loadNoteTextures :: SDL.Renderer -> IO [(Scale, Length, SDL.Texture)]
 loadNoteTextures r = do

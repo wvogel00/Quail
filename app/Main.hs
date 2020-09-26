@@ -1,6 +1,7 @@
 module Main where
 
-import Lib
+import Quail
+import Quail.GUI
 
 main :: IO ()
-main = someFunc
+main = startGUI

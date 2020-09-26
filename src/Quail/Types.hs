@@ -19,7 +19,6 @@ data Note = Note
     , sign :: Sign
     , oct :: Octave
     , len :: (Length, [Dot])
-    , keySig :: Maybe KeySignature
     , str :: Maybe Strength
     , varStr :: Maybe VariableStrength
     , tempStr :: [TempEffect]
@@ -35,7 +34,7 @@ type SlurID = Int
 
 -- 音階
 data  Scale = Rest | C | CS | D | DS | E | F | FS | G | GS | A | AS | B
-    deriving (Eq, Show, Enum)
+    deriving (Eq, Show, Enum, Ord)
 
 -- オクターブ
 type Octave = Int
@@ -44,7 +43,7 @@ type Octave = Int
 type Freq = Float
 
 -- 音符長．全音符から32分音符まで
-data Length = Full | L2 | L4 | L8 | L16 | L32 deriving (Eq, Show, Enum)
+data Length = L32 | L16 | L8 | L4 | L2 | Full deriving (Eq, Show, Enum, Ord)
 
 -- 付点
 data Dot = Dot deriving (Eq, Show)
