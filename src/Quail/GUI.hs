@@ -11,7 +11,9 @@ import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Text (Text)
+import Data.IORef (newIORef)
 import Quail.Types
+import Quail.Audio
 
 (width, height) = (600,480)
 
@@ -44,12 +46,20 @@ rendererConfig = SDL.RendererConfig
   }
 
 startGUI :: IO ()
-startGUI = withSDL $ withWindow "うずら" (width,height) $
-    \w -> withRenderer w renderLoop
+startGUI = do
+    SDL.initializeAll
+    withSDL $ withWindow "うずら" (width,height) $
+        \w -> do
+            sampleSound <- newIORef sinSamples
+            audio <- openAudio sampleSound
+            putStrLn "audio device loaded"
+            withRenderer w (renderLoop audio)
 
-renderLoop r = do
+
+renderLoop audio r = do
     SDL.rendererDrawColor r $= V4 200 200 200 30
-    event <- dealEvent <$> SDL.pollEvent
+    event <- getEvent <$> SDL.pollEvent
+    dealEvent event audio r
     t <- I.loadTexture r "imgs/note4.png"
     t2 <- I.loadTexture r "imgs/rest4.png"
     SDL.clear r
@@ -58,14 +68,22 @@ renderLoop r = do
     SDL.destroyTexture t
     SDL.destroyTexture t2
     SDL.present r
-    unless (event == Quit) $ renderLoop r
+    unless (event == Quit) $ renderLoop audio r
 
-dealEvent :: Maybe SDL.Event -> QuailEvent
-dealEvent Nothing = NotImplemented
-dealEvent (Just e) = case SDL.eventPayload e of
+
+getEvent :: Maybe SDL.Event -> QuailEvent
+getEvent Nothing = NotImplemented
+getEvent (Just e) = case SDL.eventPayload e of
     SDL.KeyboardEvent keyEvent -> getEventType keyEvent
     _ -> NotImplemented
 
+
+dealEvent :: QuailEvent -> SDL.AudioDevice -> SDL.Renderer -> IO ()
+dealEvent ev audio r = case ev of
+    PlaySound -> playAudio audio
+    StopSound -> lockAudio audio
+    ResumeSound -> resumeAudio audio
+    _ -> return ()
 
 
 addNote :: SDL.Renderer -> Scale -> IO SDL.Texture
@@ -76,6 +94,9 @@ getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
     | catchOn event (SDL.KeycodeQ, SDL.Pressed) = Quit
     | catchOn event (SDL.KeycodeA, SDL.Pressed) = AddNote C
+    | catchOn event (SDL.KeycodeP, SDL.Pressed) = PlaySound
+    | catchOn event (SDL.KeycodeS, SDL.Pressed) = StopSound
+    | catchOn event (SDL.KeycodeR, SDL.Pressed) = ResumeSound
     | otherwise = NotImplemented
 
 catchOn event (key,mode) = SDL.keyboardEventKeyMotion event == mode

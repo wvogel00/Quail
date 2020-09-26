@@ -102,4 +102,7 @@ data QuailEvent =
     | AddSign Note
     | AddSlur [Note]
     | AddTie [Note]
+    | PlaySound
+    | StopSound
+    | ResumeSound
     deriving (Eq, Show)
