@@ -15,6 +15,7 @@ import Data.Text (Text)
 import Data.IORef (newIORef)
 import Quail.Types
 import Quail.Audio
+import Debug.Trace (trace)
 
 (width, height) = (600,480)
 
@@ -49,21 +50,45 @@ startGUI = do
             audio <- openAudio sampleSound
             r <- SDL.createRenderer w (-1) rendererConfig
             ts <- loadNoteTextures r
-            void $ renderLoop audio r ts
+            void $ renderLoop audio r ts initMusicalScore
             SDL.destroyRenderer r
 
+initMusicalScore = MusicalScore [] [(GClef,[Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}])]
+initNote = Note
+    { index = 0
+    , scale = C
+    , sign = None
+    , oct = 4
+    , len = (L4,[])
+    , str = Nothing
+    , varStr = Nothing
+    , tempStr = []
+    , isVibrato = False
+    , tie = Nothing
+    , slur = Nothing
+    }
 
-renderLoop audio r ts = do
+drawClipped r t (w,h) (w',h') (px,py) = SDL.copyEx r t
+    (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 w h))
+    (Just $ SDL.Rectangle (SDL.P $ SDL.V2 px py) (SDL.V2 w' h'))
+    0
+    Nothing
+    (pure False) -- x,y軸方向に反転する時は使用
+
+renderLoop audio r ts mscore = do
+    staff <- I.loadTexture r "imgs/staffpaper.png"
     SDL.rendererDrawColor r $= V4 200 200 200 30
     event <- getEvent <$> SDL.pollEvent
-    dealEvent event audio r
-    let notes = [Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}]
+    mscore' <- dealEvent event audio r mscore
     -- draw objects
     SDL.clear r
-    drawNotes r ts notes
-    -- mapM_ (SDL.destroyTexture.(\(_,_,t) -> t)) $ ts
+    drawClipped r staff (900,150) (450,75) (20,20)
+    drawMusicalScore r ts mscore'
+
+    SDL.destroyTexture staff
+    -- mapM_ (SDL.destroyTexture.(\(_,_,t) -> t)) $ ts -- 使われていないtextureがあると落ちるので要修正
     SDL.present r
-    unless (event == Quit) $ renderLoop audio r ts
+    unless (event == Quit) $ renderLoop audio r ts mscore'
 
 
 loadNoteTextures :: SDL.Renderer -> IO [(Scale, Length, SDL.Texture)]
@@ -81,16 +106,18 @@ loadNoteTextures r = do
     t11 <- (Rest,L16,) <$> I.loadTexture r "imgs/rest16.png"
     return [t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11]
 
-drawNotes :: SDL.Renderer -> [(Scale, Length, SDL.Texture)] -> [Note] -> IO ()
-drawNotes r ts ns = foldlM_ drawNote (30, 30) ns
+drawMusicalScore :: SDL.Renderer -> [(Scale, Length, SDL.Texture)] -> MusicalScore -> IO ()
+drawMusicalScore r ts (MusicalScore keys bars) = drawBars bars
     where
-    drawNote (x,y) n = do
+    drawBars [] = return ()
+    drawBars ((_,ns):bars) = foldlM_ drawNotes (30,30) ns >> drawBars bars
+    drawNotes (x,y) n = do
         SDL.copyEx r (findTexture n ts)
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x y) (SDL.V2 80 80))
                 0
                 Nothing
-                (pure False)
+                (pure False) -- x,y軸方向に反転する時は使用
         return (x+30, y)
 
 foldlM_ f _ [] = return ()
@@ -105,20 +132,38 @@ getEvent :: Maybe SDL.Event -> QuailEvent
 getEvent Nothing = NotImplemented
 getEvent (Just e) = case SDL.eventPayload e of
     SDL.KeyboardEvent keyEvent -> getEventType keyEvent
-    _ -> NotImplemented
+    ev -> trace (show ev) NotImplemented
 
 
-dealEvent :: QuailEvent -> SDL.AudioDevice -> SDL.Renderer -> IO ()
-dealEvent ev audio r = case ev of
-    PlaySound -> playAudio audio
-    StopSound -> lockAudio audio
-    ResumeSound -> resumeAudio audio
-    _ -> return ()
+dealEvent :: QuailEvent -> SDL.AudioDevice -> SDL.Renderer -> MusicalScore -> IO MusicalScore
+dealEvent ev audio r ms = case ev of
+    PlaySound   -> playAudio audio >> return ms
+    StopSound   -> lockAudio audio >> return ms
+    ResumeSound -> resumeAudio audio >> return ms
+    AddNote s   -> return $ addNote (initNote{scale=s}) ms
+    _ -> return ms
 
 
-addNote :: SDL.Renderer -> Scale -> IO SDL.Texture
-addNote r s = I.loadTexture r "imgs/rest4.png"
+addNote n (MusicalScore keys bars) = MusicalScore keys $ init bars ++ addNote' n (last bars)
+    where
+    addNote' :: Note -> (Clef,Bar) -> [(Clef,Bar)]
+    addNote' n (GClef, bar) = if soundLen (n:bar) <= 4
+                                    then [(GClef,bar++[n])]
+                                    else [(GClef,bar), (GClef, [n])]
 
+
+soundLen :: Bar -> Float
+soundLen = sum.map noteLen
+
+noteLen :: Note -> Float
+noteLen n = let (l,ds) = len n in f l + 0.5*(fromIntegral $ length ds)
+    where
+    f  L32 = 1/32
+    f  L16 = 1/16
+    f   L8 =  1/8
+    f   L4 =  1/4
+    f   L2 =  1/2
+    f Full =    1
 
 getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event

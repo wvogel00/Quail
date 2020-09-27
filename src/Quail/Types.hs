@@ -1,8 +1,7 @@
 module Quail.Types where
 
 -- 楽譜
-data MusicalScore =
-    MusicalScore [KeySignature] [(Maybe Clef,Bar)]
+data MusicalScore =　MusicalScore [KeySignature] [(Clef,Bar)]
     deriving (Eq, Show)
 
 -- 音部記号
