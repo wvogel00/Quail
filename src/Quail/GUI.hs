@@ -12,9 +12,11 @@ import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Text (Text)
+import Data.Maybe (fromJust)
 import Data.IORef (newIORef)
-import Quail.Types
+import Quail.Utils
 import Quail.Audio
+import Quail.Types
 import Debug.Trace (trace)
 
 (width, height) = (600,480)
@@ -52,21 +54,6 @@ startGUI = do
             ts <- loadNoteTextures r
             void $ renderLoop audio r ts initMusicalScore
             SDL.destroyRenderer r
-
-initMusicalScore = MusicalScore [] [(GClef,[Note{scale=C, len = (L16,[])},Note{scale=C, len = (L2,[])}])]
-initNote = Note
-    { index = 0
-    , scale = C
-    , sign = None
-    , oct = 4
-    , len = (L4,[])
-    , str = Nothing
-    , varStr = Nothing
-    , tempStr = []
-    , isVibrato = False
-    , tie = Nothing
-    , slur = Nothing
-    }
 
 drawClipped r t (w,h) (w',h') (px,py) = SDL.copyEx r t
     (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 w h))
@@ -107,18 +94,22 @@ loadNoteTextures r = do
     return [t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11]
 
 drawMusicalScore :: SDL.Renderer -> [(Scale, Length, SDL.Texture)] -> MusicalScore -> IO ()
-drawMusicalScore r ts (MusicalScore keys bars) = drawBars bars
+drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
     where
+    drawBars :: [Bar] -> IO ()
     drawBars [] = return ()
-    drawBars ((_,ns):bars) = foldlM_ drawNotes (30,30) ns >> drawBars bars
+    drawBars (bar:bars) = foldlM_ drawNotes (30,30) (notes bar) >> drawBars bars
     drawNotes (x,y) n = do
         SDL.copyEx r (findTexture n ts)
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
-                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x y) (SDL.V2 80 80))
+                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x (posY n y)) (SDL.V2 70 70))
                 0
                 Nothing
                 (pure False) -- x,y軸方向に反転する時は使用
         return (x+30, y)
+
+--posY :: Note -> Int -> Int
+posY n y = (+) y $ fromJust . lookup (scale n) $ zip [C ..] [0,8..]
 
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
@@ -132,6 +123,7 @@ getEvent :: Maybe SDL.Event -> QuailEvent
 getEvent Nothing = NotImplemented
 getEvent (Just e) = case SDL.eventPayload e of
     SDL.KeyboardEvent keyEvent -> getEventType keyEvent
+    SDL.MouseMotionEvent ev -> MousePos 0 0
     ev -> trace (show ev) NotImplemented
 
 
@@ -141,38 +133,40 @@ dealEvent ev audio r ms = case ev of
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
     AddNote s   -> return $ addNote (initNote{scale=s}) ms
+    AddSharp -> return $ addSharp 0 ms
+    AddFlat -> return $ addFlat 0 ms
+    AddNatural -> return $ addNatural 0 ms
     _ -> return ms
 
 
-addNote n (MusicalScore keys bars) = MusicalScore keys $ init bars ++ addNote' n (last bars)
+addNote :: Note -> MusicalScore -> MusicalScore
+addNote n ms = ms{bars = init (bars ms) ++ addNote' n (last $ bars ms)}
     where
-    addNote' :: Note -> (Clef,Bar) -> [(Clef,Bar)]
-    addNote' n (GClef, bar) = if soundLen (n:bar) <= 4
-                                    then [(GClef,bar++[n])]
-                                    else [(GClef,bar), (GClef, [n])]
+    addNote' :: Note -> Bar -> [Bar]
+    addNote' n bar = if barLen bar + noteLen n <= 4
+        then [ bar{notes=notes bar ++ [n]}]
+        else [bar, bar {notes = [n]}]
 
-
-soundLen :: Bar -> Float
-soundLen = sum.map noteLen
-
-noteLen :: Note -> Float
-noteLen n = let (l,ds) = len n in f l + 0.5*(fromIntegral $ length ds)
-    where
-    f  L32 = 1/32
-    f  L16 = 1/16
-    f   L8 =  1/8
-    f   L4 =  1/4
-    f   L2 =  1/2
-    f Full =    1
 
 getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
-    | catchOn event (SDL.KeycodeQ, SDL.Pressed) = Quit
-    | catchOn event (SDL.KeycodeA, SDL.Pressed) = AddNote C
-    | catchOn event (SDL.KeycodeP, SDL.Pressed) = PlaySound
-    | catchOn event (SDL.KeycodeS, SDL.Pressed) = StopSound
-    | catchOn event (SDL.KeycodeR, SDL.Pressed) = ResumeSound
+    | catchOn event (Nothing,                       SDL.KeycodeQ,   SDL.Pressed) = Quit
+    | catchOn event (Nothing,                       SDL.KeycodeA,   SDL.Pressed) = AddNote C
+    | catchOn event (Nothing,                       SDL.KeycodeP,   SDL.Pressed) = PlaySound
+    | catchOn event (Nothing,                       SDL.KeycodeS,   SDL.Pressed) = StopSound
+    | catchOn event (Nothing,                       SDL.KeycodeR,   SDL.Pressed) = ResumeSound
+    | catchOn event (Nothing,                       SDL.KeycodeUp,  SDL.Pressed) = AddSharp
+    | catchOn event (Nothing,                       SDL.KeycodeDown,SDL.Pressed) = AddFlat
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeUp,  SDL.Pressed) = AddNatural
     | otherwise = NotImplemented
 
-catchOn event (key,mode) = SDL.keyboardEventKeyMotion event == mode
+-- キーの入力検知
+catchOn event (Nothing,key,mode) = SDL.keyboardEventKeyMotion event == mode
     && SDL.keysymKeycode (SDL.keyboardEventKeysym event) == key
+catchOn event (Just modifierF,key,mode) = catchOn event (Nothing, key,mode) && catchOn' modifierF mode
+    where
+    -- 特殊キーの入力検知
+    catchOn' modifierF mode = SDL.keyboardEventKeyMotion event == mode
+        && modifierF (SDL.keysymModifier (SDL.keyboardEventKeysym event))
+
+

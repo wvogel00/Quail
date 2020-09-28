@@ -1,15 +1,35 @@
 module Quail.Types where
 
+import Data.Text
+
+-- タイトル，ヘッダ
+data ScoreInfo = ScoreInfo Title Header
+type Title = Text
+type Header = Text
+
 -- 楽譜
-data MusicalScore =　MusicalScore [KeySignature] [(Clef,Bar)]
+data MusicalScore =　MusicalScore
+    { metro :: Metronome
+    , beatRate :: (Int,Int)
+    , bars :: [Bar]
+    }
     deriving (Eq, Show)
+
+-- テンポ
+data Metronome = Metronome Int
+    deriving (Eq,Show)
 
 -- 音部記号
 data Clef = GClef | FClef
     deriving (Eq, Show)
 
 -- 小節
-type Bar = [Note]
+data Bar = Bar
+    { clef :: Clef
+    , keys :: [KeySignature]
+    , notes :: [Note]
+    }
+    deriving (Eq, Show)
 
 -- 音符
 data Note = Note
@@ -93,8 +113,9 @@ data QuailEvent =
     | AddKeySignature KeySignature
     | AddClef Clef
     | AddNote Scale
-    | MoveUp Note
-    | MoveDown Note
+    | AddSharp
+    | AddFlat
+    | AddNatural
     | Extend Note
     | Shorten Note
     | AddSign Note
@@ -103,4 +124,5 @@ data QuailEvent =
     | PlaySound
     | StopSound
     | ResumeSound
+    | MousePos Int Int
     deriving (Eq, Show)
