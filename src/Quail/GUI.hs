@@ -80,17 +80,17 @@ renderLoop audio r ts mscore = do
 
 loadNoteTextures :: SDL.Renderer -> IO [(Scale, Length, SDL.Texture)]
 loadNoteTextures r = do
+    t7  <- (Rest,Full,) <$>I.loadTexture r "imgs/restfull.png"
+    t8  <- (Rest,L2,) <$> I.loadTexture r "imgs/rest2.png"
+    t9  <- (Rest,L4,) <$> I.loadTexture r "imgs/rest4.png"
+    t10 <- (Rest,L8,) <$> I.loadTexture r "imgs/rest8.png"
+    t11 <- (Rest,L16,) <$> I.loadTexture r "imgs/rest16.png"
     t1  <- (C,Full,) <$> I.loadTexture r "imgs/notefull.png"
     t2  <- (C,L2,)  <$> I.loadTexture r "imgs/note2.png"
     t3  <- (C,L4,) <$> I.loadTexture r "imgs/note4.png"
     t4  <- (C,L8,) <$> I.loadTexture r "imgs/note8.png"
     t5  <- (C,L16,) <$> I.loadTexture r "imgs/note16.png"
     t6  <- (C,L32,) <$> I.loadTexture r "imgs/note32.png"
-    t7  <- (Rest,Full,) <$>I.loadTexture r "imgs/restfull.png"
-    t8  <- (Rest,L2,) <$> I.loadTexture r "imgs/rest2.png"
-    t9  <- (Rest,L4,) <$> I.loadTexture r "imgs/rest4.png"
-    t10 <- (Rest,L8,) <$> I.loadTexture r "imgs/rest8.png"
-    t11 <- (Rest,L16,) <$> I.loadTexture r "imgs/rest16.png"
     return [t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11]
 
 drawMusicalScore :: SDL.Renderer -> [(Scale, Length, SDL.Texture)] -> MusicalScore -> IO ()
@@ -100,7 +100,7 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
     drawBars [] = return ()
     drawBars (bar:bars) = foldlM_ drawNotes (30,30) (notes bar) >> drawBars bars
     drawNotes (x,y) n = do
-        SDL.copyEx r (findTexture n ts)
+        SDL.copyEx r (fromJust $ findTexture n ts)
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x (posY n y)) (SDL.V2 70 70))
                 0
@@ -109,14 +109,16 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
         return (x+30, y)
 
 --posY :: Note -> Int -> Int
-posY n y = (+) y $ fromJust . lookup (scale n) $ zip [C ..] [0,8..]
+posY n y = (-) y $ fromJust . lookup (scale n) $ zip [C ..] [0,10..]
 
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
 
-findTexture :: Note -> [(Scale, Length, SDL.Texture)] -> SDL.Texture
-findTexture _ [(_,_,a)] = a
-findTexture n ((s,l,t):ts) = if scale n == s && fst (len n) == l then t else findTexture n ts
+findTexture :: Note -> [(Scale, Length, SDL.Texture)] -> Maybe SDL.Texture
+findTexture _ [] = Nothing
+findTexture n ((s,l,t):ts) = case scale n of
+            Rest -> if fst (len n) == l              then Just t else findTexture n ts
+            s'   -> if fst (len n) == l && s /= Rest then Just t else findTexture n ts
 
 
 getEvent :: Maybe SDL.Event -> QuailEvent
