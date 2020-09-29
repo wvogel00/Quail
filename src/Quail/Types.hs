@@ -1,6 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Quail.Types where
 
 import Data.Text
+import Control.Lens
 
 -- タイトル，ヘッダ
 data ScoreInfo = ScoreInfo Title Header
@@ -9,9 +12,9 @@ type Header = Text
 
 -- 楽譜
 data MusicalScore =　MusicalScore
-    { metro :: Metronome
-    , beatRate :: (Int,Int)
-    , bars :: [Bar]
+    { _metro :: Metronome
+    , _beatRate :: (Int,Int)
+    , _bars :: [Bar]
     }
     deriving (Eq, Show)
 
@@ -25,25 +28,25 @@ data Clef = GClef | FClef
 
 -- 小節
 data Bar = Bar
-    { clef :: Clef
-    , keys :: [KeySignature]
-    , notes :: [Note]
+    { _clef :: Clef
+    , _keys :: [KeySignature]
+    , _notes :: [Note]
     }
     deriving (Eq, Show)
 
 -- 音符
 data Note = Note
-    { index :: Int
-    , scale :: Scale
-    , sign :: Sign
-    , oct :: Octave
-    , len :: (Length, [Dot])
-    , str :: Maybe Strength
-    , varStr :: Maybe VariableStrength
-    , tempStr :: [TempEffect]
-    , isVibrato :: Bool
-    , tie :: Maybe TieID
-    , slur :: Maybe SlurID
+    { _no :: Int
+    , _scale :: Scale
+    , _sign :: Sign
+    , _oct :: Octave
+    , _len :: (Length, [Dot])
+    , _str :: Maybe Strength
+    , _varStr :: Maybe VariableStrength
+    , _tempStr :: [TempEffect]
+    , _isVibrato :: Bool
+    , _tie :: Maybe TieID
+    , _slur :: Maybe SlurID
     }
     deriving (Eq, Show)
 
@@ -126,3 +129,7 @@ data QuailEvent =
     | ResumeSound
     | MousePos Int Int
     deriving (Eq, Show)
+
+$(makeLenses ''MusicalScore)
+$(makeLenses ''Bar)
+$(makeLenses ''Note)

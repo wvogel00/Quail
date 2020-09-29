@@ -14,6 +14,7 @@ import Control.Monad.Extra (whileM)
 import Data.Text (Text)
 import Data.Maybe (fromJust)
 import Data.IORef (newIORef)
+import Control.Lens
 import Quail.Utils
 import Quail.Audio
 import Quail.Types
@@ -98,7 +99,7 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
     where
     drawBars :: [Bar] -> IO ()
     drawBars [] = return ()
-    drawBars (bar:bars) = foldlM_ drawNotes (30,30) (notes bar) >> drawBars bars
+    drawBars (bar:bars) = foldlM_ drawNotes (30,30) (bar^.notes) >> drawBars bars
     drawNotes (x,y) n = do
         SDL.copyEx r (fromJust $ findTexture n ts)
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
@@ -109,16 +110,16 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
         return (x+30, y)
 
 --posY :: Note -> Int -> Int
-posY n y = (-) y $ fromJust . lookup (scale n) $ zip [C ..] [0,10..]
+posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [0,10..]
 
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
 
 findTexture :: Note -> [(Scale, Length, SDL.Texture)] -> Maybe SDL.Texture
 findTexture _ [] = Nothing
-findTexture n ((s,l,t):ts) = case scale n of
-            Rest -> if fst (len n) == l              then Just t else findTexture n ts
-            s'   -> if fst (len n) == l && s /= Rest then Just t else findTexture n ts
+findTexture n ((s,l,t):ts) = case n^.scale of
+            Rest -> if fst (n^.len) == l              then Just t else findTexture n ts
+            s'   -> if fst (n^.len) == l && s /= Rest then Just t else findTexture n ts
 
 
 getEvent :: Maybe SDL.Event -> QuailEvent
@@ -134,7 +135,7 @@ dealEvent ev audio r ms = case ev of
     PlaySound   -> playAudio audio >> return ms
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
-    AddNote s   -> return $ addNote (initNote{scale=s}) ms
+    AddNote s   -> return $ addNote (initNote&scale .~ s) ms
     AddSharp -> return $ addSharp 0 ms
     AddFlat -> return $ addFlat 0 ms
     AddNatural -> return $ addNatural 0 ms
@@ -142,12 +143,12 @@ dealEvent ev audio r ms = case ev of
 
 
 addNote :: Note -> MusicalScore -> MusicalScore
-addNote n ms = ms{bars = init (bars ms) ++ addNote' n (last $ bars ms)}
+addNote n ms = ms&bars .~ (init (ms^.bars) ++ addNote' n (last $ ms^.bars))
     where
     addNote' :: Note -> Bar -> [Bar]
     addNote' n bar = if barLen bar + noteLen n <= 4
-        then [ bar{notes=notes bar ++ [n]}]
-        else [bar, bar {notes = [n]}]
+        then [ bar&notes .~ bar^.notes ++ [n]]
+        else [bar, bar&notes .~ [n]]
 
 
 getEventType :: SDL.KeyboardEventData -> QuailEvent
