@@ -28,6 +28,7 @@ dependencies:
 - process
 - text
 - vector
+- lens
 
 library:
   source-dirs: src
