@@ -39,10 +39,10 @@ playFile path = callProcess "ffplay"
     ["-f", "f32le", "-ar", show sampleRate, "-showmode", "1", path]
 
 
-noteSound :: Note -> Freq
-noteSound n = let r = 1.059463094
-                  a0 = 440 :: Freq
-              in a0/2**(fromIntegral $ 4-n^.oct) * r**(fromIntegral $ (n^.scale) `sub` A)
+getFreq :: Note -> Freq
+getFreq n = let r = 1.059463094
+                a0 = 440 :: Freq
+            in a0/2**(fromIntegral $ 4-n^.oct) * r**(fromIntegral $ (n^.scale) `sub` A)
 
 sub Rest _ = 0
 sub _ Rest = 0
@@ -91,7 +91,6 @@ sharp :: Note -> Note
 sharp n = case n^.scale of
     Rest -> n
     s    -> (\a -> a&oct +~ if sharp' s == C then 1 else 0) $ n&scale.~sharp' s
-    -- n {scale = sharp' s, oct = oct n + if sharp' s == C then 1 else 0}
     where
     sharp' s = fromJust . lookup s $ zip (B:[C ..]) $ [C ..]
 
@@ -99,6 +98,5 @@ flat :: Note -> Note
 flat n = case n^.scale of
     Rest -> n
     s    -> (\a -> a&oct -~ if s == C then 1 else 0) $ n&scale.~flat' s
-    --s    -> n {scale = flat' s, oct = oct n - if s == C then 1 else 0}
     where
     flat' s = fromJust . lookup s $ zip [C ..] $ B:[C ..]

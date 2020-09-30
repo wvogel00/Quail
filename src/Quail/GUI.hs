@@ -11,9 +11,10 @@ import Linear (V4(..))
 import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
+import Data.Int (Int16)
 import Data.Text (Text)
 import Data.Maybe (fromJust)
-import Data.IORef (newIORef)
+import Data.IORef (newIORef, writeIORef, readIORef, IORef)
 import Control.Lens
 import Quail.Utils
 import Quail.Audio
@@ -49,11 +50,11 @@ startGUI = do
     SDL.initializeAll
     withSDL $ withWindow "うずら" (width,height) $
         \w -> do
-            sampleSound <- newIORef sinSamples
-            audio <- openAudio sampleSound
+            sound <- newIORef []
+            audioDev <- openAudio sound
             r <- SDL.createRenderer w (-1) rendererConfig
             ts <- loadNoteTextures r
-            void $ renderLoop audio r ts initMusicalScore
+            void $ renderLoop (audioDev,sound) r ts initMusicalScore
             SDL.destroyRenderer r
 
 drawClipped r t (w,h) (w',h') (px,py) = SDL.copyEx r t
@@ -110,7 +111,7 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
         return (x+30, y)
 
 --posY :: Note -> Int -> Int
-posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [0,10..]
+posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [0,4..]
 
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
@@ -127,15 +128,20 @@ getEvent Nothing = NotImplemented
 getEvent (Just e) = case SDL.eventPayload e of
     SDL.KeyboardEvent keyEvent -> getEventType keyEvent
     SDL.MouseMotionEvent ev -> MousePos 0 0
-    ev -> trace (show ev) NotImplemented
+    ev -> {-trace (show ev)-} NotImplemented
 
 
-dealEvent :: QuailEvent -> SDL.AudioDevice -> SDL.Renderer -> MusicalScore -> IO MusicalScore
-dealEvent ev audio r ms = case ev of
-    PlaySound   -> playAudio audio >> return ms
+dealEvent :: QuailEvent -> (SDL.AudioDevice, IORef [Int16]) -> SDL.Renderer -> MusicalScore -> IO MusicalScore
+dealEvent ev (audio,sound) r ms = case ev of
+    PlaySound   -> playAudio audio sound >> return ms
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
-    AddNote s   -> return $ addNote (initNote&scale .~ s) ms
+    AddNote s   -> do
+        let n = (\a -> a&len.~(Full,[]))$ initNote&scale .~ s
+        writeIORef sound $ noteSound (ms^.metro) n
+        playAudio audio sound
+        return $trace (show s) $ addNote n ms
+        
     AddSharp -> return $ addSharp 0 ms
     AddFlat -> return $ addFlat 0 ms
     AddNatural -> return $ addNatural 0 ms
@@ -154,7 +160,18 @@ addNote n ms = ms&bars .~ (init (ms^.bars) ++ addNote' n (last $ ms^.bars))
 getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
     | catchOn event (Nothing,                       SDL.KeycodeQ,   SDL.Pressed) = Quit
-    | catchOn event (Nothing,                       SDL.KeycodeA,   SDL.Pressed) = AddNote C
+    | catchOn event (Nothing,                       SDL.KeycodeC,   SDL.Pressed) = AddNote C
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeC,   SDL.Pressed) = AddNote CS
+    | catchOn event (Nothing,                       SDL.KeycodeD,   SDL.Pressed) = AddNote D
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeD,   SDL.Pressed) = AddNote DS
+    | catchOn event (Nothing,                       SDL.KeycodeE,   SDL.Pressed) = AddNote E
+    | catchOn event (Nothing,                       SDL.KeycodeF,   SDL.Pressed) = AddNote F
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeF,   SDL.Pressed) = AddNote FS
+    | catchOn event (Nothing,                       SDL.KeycodeG,   SDL.Pressed) = AddNote G
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeG,   SDL.Pressed) = AddNote GS
+    | catchOn event (Nothing,                       SDL.KeycodeA,   SDL.Pressed) = AddNote A
+    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeA,   SDL.Pressed) = AddNote AS
+    | catchOn event (Nothing,                       SDL.KeycodeB,   SDL.Pressed) = AddNote B
     | catchOn event (Nothing,                       SDL.KeycodeP,   SDL.Pressed) = PlaySound
     | catchOn event (Nothing,                       SDL.KeycodeS,   SDL.Pressed) = StopSound
     | catchOn event (Nothing,                       SDL.KeycodeR,   SDL.Pressed) = ResumeSound
