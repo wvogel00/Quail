@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 81baa1866ec4b3d1e8476274a484b53d462715b1ee5fdb3d2c0df9a6be99a49e
+-- hash: 5d8b0b766979ae3b7a47b6651463c5cc3ab18147374fb5cbd3d8e9b6478c40a1
 
 name:           Quail
 version:        0.1.0.0
@@ -27,7 +27,6 @@ source-repository head
 
 library
   exposed-modules:
-      Quail
       Quail.Audio
       Quail.GUI
       Quail.Types
@@ -37,8 +36,10 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , extra
+    , lens
     , linear >=1.21
     , process
     , sdl2 >=2.5.0.0
@@ -56,8 +57,10 @@ executable Quail-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Quail
+    , aeson
     , base >=4.7 && <5
     , extra
+    , lens
     , linear >=1.21
     , process
     , sdl2 >=2.5.0.0
@@ -76,8 +79,10 @@ test-suite Quail-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Quail
+    , aeson
     , base >=4.7 && <5
     , extra
+    , lens
     , linear >=1.21
     , process
     , sdl2 >=2.5.0.0

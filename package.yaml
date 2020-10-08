@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - sdl2 >= 2.5.0.0
 - sdl2-image
+- aeson
 - extra
 - linear >= 1.21
 - process

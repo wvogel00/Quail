@@ -1,9 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Quail.Types where
 
-import Data.Text
+import Data.Text ( Text )
 import Control.Lens
+import Data.Aeson
+import GHC.Generics (Generic)
+
+jsonOpts :: Options
+jsonOpts = defaultOptions { 
+    fieldLabelModifier = dropWhile (== '_')
+  , tagSingleConstructors = True
+}
 
 -- タイトル，ヘッダ
 data ScoreInfo = ScoreInfo Title Header
@@ -16,15 +25,30 @@ data MusicalScore =　MusicalScore
     , _beatRate :: (Int,Int)
     , _bars :: [Bar]
     }
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON MusicalScore where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON MusicalScore where
+    toEncoding = genericToEncoding jsonOpts
 
 -- テンポ
 data Metronome = Metronome Int
-    deriving (Eq,Show)
+    deriving (Eq,Show,Generic)
+
+instance FromJSON Metronome where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Metronome where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 音部記号
 data Clef = GClef | FClef
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON Clef where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Clef where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 小節
 data Bar = Bar
@@ -32,7 +56,12 @@ data Bar = Bar
     , _keys :: [KeySignature]
     , _notes :: [Note]
     }
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON Bar where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Bar where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 音符
 data Note = Note
@@ -48,7 +77,12 @@ data Note = Note
     , _tie :: Maybe TieID
     , _slur :: Maybe SlurID
     }
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON Note where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Note where
+    toEncoding = genericToEncoding jsonOpts
 
 -- タイ・スラーの管理ID
 type TieID = Int
@@ -56,7 +90,13 @@ type SlurID = Int
 
 -- 音階
 data  Scale = Rest | C | CS | D | DS | E | F | FS | G | GS | A | AS | B
-    deriving (Eq, Show, Enum, Ord)
+    deriving (Eq, Show, Enum, Ord, Generic)
+
+instance FromJSON Scale where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Scale where
+    toEncoding = genericToEncoding jsonOpts
+
 
 -- オクターブ
 type Octave = Int
@@ -65,16 +105,31 @@ type Octave = Int
 type Freq = Float
 
 -- 音符長．全音符から32分音符まで
-data Length = L32 | L16 | L8 | L4 | L2 | Full deriving (Eq, Show, Enum, Ord)
+data Length = L32 | L16 | L8 | L4 | L2 | Full deriving (Eq, Show, Enum, Ord, Generic)
+
+instance FromJSON Length where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Length where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 付点
-data Dot = Dot deriving (Eq, Show)
+data Dot = Dot deriving (Eq, Show, Generic)
+
+instance FromJSON Dot where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Dot where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 調号
 type KeySignature = (Scale, Sign)
 
 data Sign = None | Sharp | DoubleSharp | Flat | DoubleFlat | Natural
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON Sign where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Sign where
+    toEncoding = genericToEncoding jsonOpts
 
 data Strength =
     Pianissimo -- pp
@@ -94,7 +149,12 @@ data Strength =
     | Meno -- memo
     | SottoVoce -- sotto voce
     | MezzaVoce -- mezza voce
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON Strength where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON Strength where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 小節単位の効果
 data BarEffect = Repeat | DaCapo | DalSegno | Segno
@@ -104,11 +164,21 @@ data BarEffect = Repeat | DaCapo | DalSegno | Segno
 data VariableStrength = 
     Crescendo
     | Decrescendo
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON VariableStrength where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON VariableStrength where
+    toEncoding = genericToEncoding jsonOpts
 
 -- 一時的な音効果
 data TempEffect = Accent | Staccato
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+
+instance FromJSON TempEffect where
+    parseJSON = genericParseJSON jsonOpts
+instance ToJSON TempEffect where
+    toEncoding = genericToEncoding jsonOpts
 
 data QuailEvent =
     Quit
