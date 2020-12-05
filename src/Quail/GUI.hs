@@ -100,19 +100,28 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
     where
     drawBars :: [Bar] -> IO ()
     drawBars [] = return ()
-    drawBars (bar:bars) = foldlM_ drawNotes (30,30) (bar^.notes) >> drawBars bars
+    drawBars (bar:bars) = foldlM_ drawNotes (30,28) (bar^.notes) >> drawBars bars
     drawNotes (x,y) n = do
         SDL.copyEx r (fromJust $ findTexture n ts)
                 (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 960 960))
-                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x (posY n y)) (SDL.V2 70 70))
+                (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x (posY n y)) (SDL.V2 65 65))
                 0
                 Nothing
                 (pure False) -- x,y軸方向に反転する時は使用
+        if elem (n^.scale) [CS,DS,FS,GS,AS]
+            then do
+                sharpImg <- I.loadTexture r "imgs/sharp.png"
+                SDL.copyEx r sharpImg
+                    (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 200 200))
+                    (Just $ SDL.Rectangle (SDL.P $ SDL.V2 (x+15) (posY n y+20)) (SDL.V2 20 20))
+                    0
+                    Nothing
+                    (pure False)
+                    else return ()
         return (x+30, y)
 
 --posY :: Note -> Int -> Int
-posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [0,4..]
-
+posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [-9,-9,-6,-6,-1,3,3, 7,7,12,12,16]
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
 
@@ -139,16 +148,16 @@ dealEvent ev (audio,sound) r ms = case ev of
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
     AddNote s   -> do
-        let n = (\a -> a&no.~noteCount ms)$ initNote&scale .~ s
+        let n = (\a -> a&no.~noteCount ms+1)$ initNote&scale .~ s
         return $ trace (show n) $ addNote n ms
     DeleteNote -> do
         let lastbar = last (ms^.bars)
             lastbar' = lastbar&notes .~ init (lastbar^.notes)
         return $ ms&bars .~ (init (ms^.bars)) ++ [lastbar']
-    AddSharp -> return $ addSharp (noteCount ms-1) ms
-    AddFlat  -> return $ addFlat  (noteCount ms-1) ms
-    Shorten  -> return $ shorten  (noteCount ms-1) ms
-    Lengthen -> return $ lengthen (noteCount ms-1) ms
+    AddSharp -> return $ addSharp (noteCount ms) ms
+    AddFlat  -> return $ addFlat  (noteCount ms) ms
+    Shorten  -> return $ shorten  (noteCount ms) ms
+    Lengthen -> return $ lengthen (noteCount ms) ms
     _ -> return ms
 
 
