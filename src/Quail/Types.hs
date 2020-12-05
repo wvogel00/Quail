@@ -118,9 +118,9 @@ data QuailEvent =
     | AddNote Scale
     | AddSharp
     | AddFlat
-    | AddNatural
-    | Extend Note
-    | Shorten Note
+    | Shorten
+    | Lengthen
+    | DeleteNote
     | AddSign Note
     | AddSlur [Note]
     | AddTie [Note]

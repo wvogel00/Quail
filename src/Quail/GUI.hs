@@ -133,18 +133,20 @@ getEvent (Just e) = case SDL.eventPayload e of
 
 dealEvent :: QuailEvent -> (SDL.AudioDevice, IORef [Int16]) -> SDL.Renderer -> MusicalScore -> IO MusicalScore
 dealEvent ev (audio,sound) r ms = case ev of
-    PlaySound   -> playAudio audio sound >> return ms
+    PlaySound   -> do
+        buildMusic ms sound
+        playAudio audio sound >> return ms
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
     AddNote s   -> do
-        let n = (\a -> a&len.~(Full,[]))$ initNote&scale .~ s
-        writeIORef sound $ noteSound (ms^.metro) n
-        playAudio audio sound
-        return $trace (show s) $ addNote n ms
-        
+        let n = (\a -> a&len.~(L4,[]))$ initNote&scale .~ s
+        return $ trace (show s) $ addNote n ms
+    DeleteNote -> do
+        let lastbar = last (ms^.bars)
+            lastbar' = lastbar&notes .~ init (lastbar^.notes)
+        return $ ms&bars .~ (init (ms^.bars)) ++ [lastbar']
     AddSharp -> return $ addSharp 0 ms
     AddFlat -> return $ addFlat 0 ms
-    AddNatural -> return $ addNatural 0 ms
     _ -> return ms
 
 
@@ -177,7 +179,9 @@ getEventType event
     | catchOn event (Nothing,                       SDL.KeycodeR,   SDL.Pressed) = ResumeSound
     | catchOn event (Nothing,                       SDL.KeycodeUp,  SDL.Pressed) = AddSharp
     | catchOn event (Nothing,                       SDL.KeycodeDown,SDL.Pressed) = AddFlat
-    | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeUp,  SDL.Pressed) = AddNatural
+    | catchOn event (Nothing,                       SDL.KeycodeLeft,  SDL.Pressed) = Shorten
+    | catchOn event (Nothing,                       SDL.KeycodeRight,SDL.Pressed) = Lengthen
+    | catchOn event (Nothing,                       SDL.KeycodeBackspace,SDL.Pressed) = DeleteNote
     | otherwise = NotImplemented
 
 -- キーの入力検知
