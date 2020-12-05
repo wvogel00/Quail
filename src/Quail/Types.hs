@@ -20,7 +20,10 @@ data MusicalScore =　MusicalScore
 
 -- テンポ
 data Metronome = Metronome Int
-    deriving (Eq,Show)
+    deriving Eq
+
+instance Show Metronome where
+    show (Metronome m) = "= " ++ show m
 
 -- 音部記号
 data Clef = GClef | FClef
@@ -128,6 +131,10 @@ data QuailEvent =
     | StopSound
     | ResumeSound
     | MousePos Int Int
+    | SaveEvent
+    | Save FilePath
+    | OpenEvent
+    | Open FilePath
     deriving (Eq, Show)
 
 $(makeLenses ''MusicalScore)

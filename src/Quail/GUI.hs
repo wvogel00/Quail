@@ -5,6 +5,7 @@ module Quail.GUI where
 
 import SDL (($=))
 import qualified SDL
+import qualified SDL.Font as Font
 import qualified SDL.Image as I
 import SDL.Raw.Video as V
 import Linear (V4(..))
@@ -12,7 +13,7 @@ import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Int (Int16)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.Maybe (fromJust)
 import Data.IORef (newIORef, writeIORef, readIORef, IORef)
 import Control.Lens
@@ -22,6 +23,10 @@ import Quail.Types
 import Debug.Trace (trace)
 
 (width, height) = (600,480)
+fontpath = "ttf/Raleway-Regular.ttf"
+
+gray = SDL.V4 128 128 128 255
+black = SDL.V4 0 0 0 255
 
 withSDL :: (MonadIO m) => m a -> m ()
 withSDL op = do
@@ -48,6 +53,7 @@ rendererConfig = SDL.RendererConfig
 startGUI :: IO ()
 startGUI = do
     SDL.initializeAll
+    Font.initialize
     withSDL $ withWindow "うずら" (width,height) $
         \w -> do
             sound <- newIORef []
@@ -69,16 +75,34 @@ renderLoop audio r ts mscore = do
     SDL.rendererDrawColor r $= V4 200 200 200 30
     event <- getEvent <$> SDL.pollEvent
     mscore' <- dealEvent event audio r mscore
-    -- draw objects
+    
+    -- 楽譜描画
     SDL.clear r
     drawClipped r staff (900,150) (450,75) (20,20)
     drawMusicalScore r ts mscore'
 
+    -- テンポの描画
+    drawText r (30,10) 16 $ pack $ show (mscore^.metro)
+
+    -- 更新
     SDL.destroyTexture staff
     -- mapM_ (SDL.destroyTexture.(\(_,_,t) -> t)) $ ts -- 使われていないtextureがあると落ちるので要修正
     SDL.present r
     unless (event == Quit) $ renderLoop audio r ts mscore'
 
+
+drawText r (x,y) fontsize text = do
+    font <- Font.load fontpath fontsize
+    textSurface <- Font.solid font black text
+    (w,h) <- Font.size font text
+    textTexture <- SDL.createTextureFromSurface r textSurface
+    Font.free font
+    SDL.copyEx r textTexture
+        (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 (fromIntegral width) (fromIntegral height)))
+        (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x y) (SDL.V2 (fromIntegral w) (fromIntegral h)))
+        0
+        Nothing
+        (pure False)
 
 loadNoteTextures :: SDL.Renderer -> IO [(Scale, Length, SDL.Texture)]
 loadNoteTextures r = do
@@ -158,6 +182,8 @@ dealEvent ev (audio,sound) r ms = case ev of
     AddFlat  -> return $ addFlat  (noteCount ms) ms
     Shorten  -> return $ shorten  (noteCount ms) ms
     Lengthen -> return $ lengthen (noteCount ms) ms
+    OpenEvent -> print "open" >> return ms
+    SaveEvent -> print "save" >> return ms
     _ -> return ms
 
 
@@ -172,6 +198,8 @@ addNote n ms = ms&bars .~ (init (ms^.bars) ++ addNote' n (last $ ms^.bars))
 
 getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
+    | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeO,   SDL.Pressed) = OpenEvent
+    | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeS,   SDL.Pressed) = SaveEvent
     | catchOn event (Nothing,                       SDL.KeycodeQ,   SDL.Pressed) = Quit
     | catchOn event (Nothing,                       SDL.KeycodeB,   SDL.Pressed) = AddNote B
     | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeA,   SDL.Pressed) = AddNote AS
