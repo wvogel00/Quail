@@ -139,14 +139,16 @@ dealEvent ev (audio,sound) r ms = case ev of
     StopSound   -> lockAudio audio >> return ms
     ResumeSound -> resumeAudio audio >> return ms
     AddNote s   -> do
-        let n = (\a -> a&len.~(L4,[]))$ initNote&scale .~ s
-        return $ trace (show s) $ addNote n ms
+        let n = (\a -> a&no.~noteCount ms)$ initNote&scale .~ s
+        return $ trace (show n) $ addNote n ms
     DeleteNote -> do
         let lastbar = last (ms^.bars)
             lastbar' = lastbar&notes .~ init (lastbar^.notes)
         return $ ms&bars .~ (init (ms^.bars)) ++ [lastbar']
-    AddSharp -> return $ addSharp 0 ms
-    AddFlat -> return $ addFlat 0 ms
+    AddSharp -> return $ addSharp (noteCount ms-1) ms
+    AddFlat  -> return $ addFlat  (noteCount ms-1) ms
+    Shorten  -> return $ shorten  (noteCount ms-1) ms
+    Lengthen -> return $ lengthen (noteCount ms-1) ms
     _ -> return ms
 
 
