@@ -8,6 +8,7 @@ import Quail.Types
 import Control.Lens
 import qualified Data.ByteString.Lazy as L
 import Data.Aeson ( eitherDecode, encodeFile )
+import System.FilePath.Posix (takeExtension)
 
 sampleRate = 44100
 
@@ -16,8 +17,7 @@ initMusicalScore = MusicalScore
     , _beatRate = (4,4)
     , _bars = [Bar { _clef = GClef
                    , _keys = []
-                   , _notes = [initNote{_no = 0, _len = (L32,[])}
-                              ,initNote{_no = 1, _len = ( L2,[])}]
+                   , _notes = []
                   }]
     } 
 
@@ -70,11 +70,27 @@ noteLen n = (getLen l) + sum (map (\v -> 1/2^v) $take (length dots) [1..])
         getLen l = (\v -> 1/2^v). fromJust . lookup l $ zip (reverse [L32 .. ]) [0,1..]
 
 
-addSharp :: Int -> MusicalScore -> MusicalScore
+addSharp, addFlat, shorten, lengthen :: Int -> MusicalScore -> MusicalScore
 addSharp i ms = opeNote i sharp ms
-
-addFlat :: Int -> MusicalScore -> MusicalScore
 addFlat  i ms = opeNote i flat ms
+shorten  i ms = opeNote i shorten' ms
+    where
+    shorten' n = case n^.len of
+        ( L32,dots) -> n&len .~ (L32,dots)
+        ( L16,dots) -> n&len .~ (L32,dots)
+        (  L8,dots) -> n&len .~ (L16,dots)
+        (  L4,dots) -> n&len .~ ( L8,dots)
+        (  L2,dots) -> n&len .~ ( L4,dots)
+        (Full,dots) -> n&len .~ ( L2,dots)
+lengthen i ms = opeNote i lengthen' ms
+    where
+    lengthen' n = case n^.len of
+        ( L32,dots) -> n&len .~ ( L16,dots)
+        ( L16,dots) -> n&len .~ (  L8,dots)
+        (  L8,dots) -> n&len .~ (  L4,dots)
+        (  L4,dots) -> n&len .~ (  L2,dots)
+        (  L2,dots) -> n&len .~ (Full,dots)
+        (Full,dots) -> n&len .~ (Full,dots)
 
 addNatural :: Int -> MusicalScore -> MusicalScore
 addNatural i ms = opeNote i (\n -> n&sign .~ Natural) ms
@@ -93,6 +109,9 @@ applySign DoubleSharp = sharp.sharp
 applySign Flat = flat
 applySign DoubleFlat = flat.flat
 
+noteCount :: MusicalScore -> Int
+noteCount ms = length $ concatMap (^.notes) $ ms^.bars
+
 sharp :: Note -> Note
 sharp n = case n^.scale of
     Rest -> n
@@ -106,3 +125,6 @@ flat n = case n^.scale of
     s    -> (\a -> a&oct -~ if s == C then 1 else 0) $ n&scale.~flat' s
     where
     flat' s = fromJust . lookup s $ zip [C ..] $ B:[C ..]
+
+isQuailFile :: String -> Bool
+isQuailFile file = takeExtension file == ".quail"

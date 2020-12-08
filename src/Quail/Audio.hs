@@ -7,6 +7,7 @@ import qualified SDL
 import Control.Monad (zipWithM_)
 import Data.Int (Int16,Int32)
 import Data.IORef
+import Control.Lens
 import qualified Data.Vector.Storable.Mutable as V
 import Quail.Utils (getFreq, noteLen)
 import Quail.Types
@@ -20,6 +21,12 @@ noteSound (Metronome t) n = map f [0,1/fromIntegral sampleFreq .. soundLen*l]
     f t = round $ fromIntegral (div maxBound 2 :: Int16) * sin (2*pi*fq*t)
     (l,fq) = ( 4 * noteLen n, getFreq n) -- noteの長さを，4分音符の個数に変換
     soundLen = 60/fromIntegral t -- 4分音符一つあたりの音の長さ
+
+
+buildMusic :: MusicalScore -> IORef [Int16] -> IO ()
+buildMusic ms sound = writeIORef sound $ concatMap (noteSound (ms^.metro))
+                                       $ concatMap (^.notes) (ms^.bars)
+
 
 sinSamples :: [Int16]
 sinSamples = map f [0..] where
@@ -62,8 +69,12 @@ playAudio :: SDL.AudioDevice -> IORef [a] -> IO ()
 playAudio dev sound = do
     sound' <- readIORef sound
     if null sound'
-        then SDL.setAudioDeviceLocked dev SDL.Locked
-        else SDL.setAudioDevicePlaybackState dev SDL.Play
+        then do
+            putStrLn "sound is null"
+            SDL.setAudioDeviceLocked dev SDL.Locked
+        else do
+            putStrLn "play sound."
+            SDL.setAudioDevicePlaybackState dev SDL.Play
 
 lockAudio :: SDL.AudioDevice -> IO ()
 lockAudio dev = SDL.setAudioDeviceLocked dev SDL.Locked

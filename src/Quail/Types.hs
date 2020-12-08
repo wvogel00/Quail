@@ -40,6 +40,8 @@ instance FromJSON Metronome where
     parseJSON = genericParseJSON jsonOpts
 instance ToJSON Metronome where
     toEncoding = genericToEncoding jsonOpts
+instance Show Metronome where
+    show (Metronome m) = "= " ++ show m
 
 -- 音部記号
 data Clef = GClef | FClef
@@ -188,9 +190,9 @@ data QuailEvent =
     | AddNote Scale
     | AddSharp
     | AddFlat
-    | AddNatural
-    | Extend Note
-    | Shorten Note
+    | Shorten
+    | Lengthen
+    | DeleteNote
     | AddSign Note
     | AddSlur [Note]
     | AddTie [Note]
@@ -198,7 +200,26 @@ data QuailEvent =
     | StopSound
     | ResumeSound
     | MousePos Int Int
+    | SaveEvent
+    | LoadEvent
     deriving (Eq, Show)
+
+data SaveEvent =
+    QuitSave
+    | Save
+    | SaveChoice_Up
+    | SaveChoice_Down
+    | SaveName_Input Char
+    | ContinueSave
+    deriving Eq
+
+data LoadEvent =
+    QuitLoad
+    | Load
+    | LoadChoice_Up
+    | LoadChoice_Down
+    | ContinueLoad
+    deriving Eq
 
 $(makeLenses ''MusicalScore)
 $(makeLenses ''Bar)
