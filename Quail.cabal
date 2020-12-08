@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0993d7de89cb56957097ddbe922ce552c610ad5d022c1bb0e880a5faba352d65
+-- hash: 6703581a724885c07d3536a72c66d6c10bb6ff260859d24bc0ed251cef7364ea
 
 name:           Quail
 version:        0.1.0.0
@@ -36,7 +36,9 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , directory
     , extra
     , filepath
@@ -59,7 +61,9 @@ executable Quail-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Quail
+    , aeson
     , base >=4.7 && <5
+    , bytestring
     , directory
     , extra
     , filepath
@@ -83,7 +87,9 @@ test-suite Quail-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Quail
+    , aeson
     , base >=4.7 && <5
+    , bytestring
     , directory
     , extra
     , filepath

@@ -186,9 +186,11 @@ dealEvent ev (audio,sound) r ms = case ev of
         let n = (\a -> a&no.~noteCount ms+1)$ initNote&scale .~ s
         return $ trace (show n) $ addNote n ms
     DeleteNote -> do
-        let lastbar = last (ms^.bars)
-            lastbar' = lastbar&notes .~ init (lastbar^.notes)
-        return $ ms&bars .~ (init (ms^.bars)) ++ [lastbar']
+        case safelast (ms^.bars) of
+            Nothing -> return ms
+            Just b -> case safeinit (b^.notes) of
+                Nothing -> return ms
+                Just ns -> return $ ms&bars .~ (init $ ms^.bars) ++ [b&notes .~ ns]
     AddSharp -> return $ addSharp (noteCount ms) ms
     AddFlat  -> return $ addFlat  (noteCount ms) ms
     Shorten  -> return $ shorten  (noteCount ms) ms
