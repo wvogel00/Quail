@@ -30,6 +30,8 @@ dependencies:
 - text
 - vector
 - lens
+- directory
+- filepath
 
 library:
   source-dirs: src
