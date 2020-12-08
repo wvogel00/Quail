@@ -6,8 +6,9 @@ import Data.List
 import Data.Maybe
 import Quail.Types
 import Control.Lens
+import qualified Data.ByteString.Lazy as L
+import Data.Aeson ( eitherDecode, encodeFile )
 import System.FilePath.Posix (takeExtension)
-
 
 sampleRate = 44100
 
@@ -38,6 +39,11 @@ playFile :: FilePath -> IO ()
 playFile path = callProcess "ffplay"
     ["-f", "f32le", "-ar", show sampleRate, "-showmode", "1", path]
 
+readScore :: FilePath -> IO (Either String MusicalScore)
+readScore path = eitherDecode <$> L.readFile path
+
+writeScore :: FilePath -> MusicalScore -> IO ()
+writeScore = encodeFile
 
 getFreq :: Note -> Freq
 getFreq n = let r = 1.059463094
