@@ -6,6 +6,7 @@ import Data.List
 import Data.Maybe
 import Quail.Types
 import Control.Lens
+import System.FilePath.Posix (takeExtension)
 
 
 sampleRate = 44100
@@ -118,3 +119,6 @@ flat n = case n^.scale of
     s    -> (\a -> a&oct -~ if s == C then 1 else 0) $ n&scale.~flat' s
     where
     flat' s = fromJust . lookup s $ zip [C ..] $ B:[C ..]
+
+isQuailFile :: String -> Bool
+isQuailFile file = takeExtension file == ".quail"

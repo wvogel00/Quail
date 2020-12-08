@@ -7,6 +7,7 @@ import SDL (($=))
 import qualified SDL
 import qualified SDL.Font as Font
 import qualified SDL.Image as I
+import qualified SDL.Internal.Numbered as SDLN
 import SDL.Raw.Video as V
 import Linear (V4(..))
 import Control.Monad (void, unless)
@@ -14,12 +15,14 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Int (Int16)
 import Data.Text (Text, pack)
+import Data.List (lookup)
 import Data.Maybe (fromJust)
 import Data.IORef (newIORef, writeIORef, readIORef, IORef)
 import Control.Lens
 import Quail.Utils
 import Quail.Audio
 import Quail.Types
+import System.Directory
 import Debug.Trace (trace)
 
 (width, height) = (600,480)
@@ -27,6 +30,8 @@ fontpath = "ttf/Raleway-Regular.ttf"
 
 gray = SDL.V4 128 128 128 255
 black = SDL.V4 0 0 0 255
+saveScreenColor = V4 200 200 200 100
+loadScreenColor = V4 220 180 180 100
 
 withSDL :: (MonadIO m) => m a -> m ()
 withSDL op = do
@@ -63,6 +68,7 @@ startGUI = do
             void $ renderLoop (audioDev,sound) r ts initMusicalScore
             SDL.destroyRenderer r
 
+
 drawClipped r t (w,h) (w',h') (px,py) = SDL.copyEx r t
     (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 w h))
     (Just $ SDL.Rectangle (SDL.P $ SDL.V2 px py) (SDL.V2 w' h'))
@@ -72,17 +78,21 @@ drawClipped r t (w,h) (w',h') (px,py) = SDL.copyEx r t
 
 renderLoop audio r ts mscore = do
     staff <- I.loadTexture r "imgs/staffpaper.png"
-    SDL.rendererDrawColor r $= V4 200 200 200 30
+    SDL.rendererDrawColor r $= V4 255 255 255 30
     event <- getEvent <$> SDL.pollEvent
     mscore' <- dealEvent event audio r mscore
     
     -- 楽譜描画
     SDL.clear r
-    drawClipped r staff (900,150) (450,75) (20,20)
+    drawClipped r staff (1000,150) (500,75) (20,20)
+    drawClipped r staff (1000,150) (500,75) (20,110)
+    drawClipped r staff (1000,150) (500,75) (20,200)
+    drawClipped r staff (1000,150) (500,75) (20,290)
+    drawClipped r staff (1000,150) (500,75) (20,380)
     drawMusicalScore r ts mscore'
 
     -- テンポの描画
-    drawText r (30,10) 16 $ pack $ show (mscore^.metro)
+    drawText r 16 (30,10) $ pack $ show (mscore^.metro)
 
     -- 更新
     SDL.destroyTexture staff
@@ -91,7 +101,7 @@ renderLoop audio r ts mscore = do
     unless (event == Quit) $ renderLoop audio r ts mscore'
 
 
-drawText r (x,y) fontsize text = do
+drawText r fontsize (x,y) text = do
     font <- Font.load fontpath fontsize
     textSurface <- Font.solid font black text
     (w,h) <- Font.size font text
@@ -146,6 +156,7 @@ drawMusicalScore r ts (MusicalScore metro keys bars) = drawBars bars
 
 --posY :: Note -> Int -> Int
 posY n y = (-) y $ fromJust . lookup (n^.scale) $ zip [C ..] [-9,-9,-6,-6,-1,3,3, 7,7,12,12,16]
+foldlM_ :: Monad m => (a -> b -> m a) -> a -> [b] -> m ()
 foldlM_ f _ [] = return ()
 foldlM_ f a (n:ns) = f a n >>= \a' -> foldlM_ f a' ns
 
@@ -182,9 +193,87 @@ dealEvent ev (audio,sound) r ms = case ev of
     AddFlat  -> return $ addFlat  (noteCount ms) ms
     Shorten  -> return $ shorten  (noteCount ms) ms
     Lengthen -> return $ lengthen (noteCount ms) ms
-    OpenEvent -> print "open" >> return ms
-    SaveEvent -> print "save" >> return ms
+    LoadEvent -> do
+        loadResult <- loadLoop r
+        case loadResult of
+            Just loadms -> return loadms
+            Nothing -> return ms
+    SaveEvent -> saveLoop r [] >> return ms
     _ -> return ms
+
+
+loadLoop r = do
+    event <- getLoadEvent <$> SDL.pollEvent
+    SDL.rendererDrawColor r $= loadScreenColor
+    SDL.clear r
+    drawText r 20 (100,40) "choose the filename:"
+    files <- filter isQuailFile <$> getDirectoryContents "scores"
+    foldlM_ (drawTextList r 20) (100,65) $ map pack files
+    SDL.present r
+    case event of
+        QuitLoad -> return Nothing
+        Load -> return.Just $ initMusicalScore -- 未実装
+        LoadChoice_Up -> print "up" >> loadLoop r
+        LoadChoice_Down -> print "down" >> loadLoop r
+        ContinueLoad ->  loadLoop r
+
+drawTextList r fontsize (x,y) t = do
+    drawText r fontsize (x,y) t
+    return (x,y+fromIntegral fontsize+5)
+
+
+getLoadEvent :: Maybe SDL.Event -> LoadEvent
+getLoadEvent Nothing = ContinueLoad
+getLoadEvent (Just e) = case SDL.eventPayload e of
+    SDL.KeyboardEvent keyEvent -> getLoadEventType keyEvent
+    ev -> ContinueLoad
+
+
+getLoadEventType :: SDL.KeyboardEventData -> LoadEvent
+getLoadEventType event
+    | catchOn event (Nothing, SDL.KeycodeReturn,  SDL.Pressed) = Load
+    | catchOn event (Nothing, SDL.KeycodeEscape,  SDL.Pressed) = QuitLoad
+    | catchOn event (Nothing, SDL.KeycodeUp,    SDL.Pressed) = LoadChoice_Up
+    | catchOn event (Nothing, SDL.KeycodeDown,  SDL.Pressed) = LoadChoice_Down
+    | otherwise = ContinueLoad
+
+
+saveLoop r filename = do
+    event <- getSaveEvent <$> SDL.pollEvent
+    SDL.rendererDrawColor r $= saveScreenColor
+    SDL.clear r
+    drawText r 20 (100,40) "choose or type the filename:"
+    unless (null filename) $ drawText r 20 (100,65) $ pack filename
+    SDL.present r
+    case event of
+        QuitSave -> return ()
+        Save -> do
+            print $ "save file as" ++ filename ++ " (not implemented)"
+            saveLoop r filename
+        SaveName_Input c -> saveLoop r (filename++[c])
+        SaveChoice_Up -> print "up" >> saveLoop r filename
+        SaveChoice_Down -> print "down" >> saveLoop r filename
+        ContinueSave -> saveLoop r filename
+
+
+getSaveEvent :: Maybe SDL.Event -> SaveEvent
+getSaveEvent Nothing = ContinueSave
+getSaveEvent (Just e) = case SDL.eventPayload e of
+    SDL.KeyboardEvent keyEvent -> getSaveEventType keyEvent
+    ev -> ContinueSave
+
+
+getSaveEventType :: SDL.KeyboardEventData -> SaveEvent
+getSaveEventType event
+    | catchOn event (Nothing, SDL.KeycodeReturn,  SDL.Pressed) = Save
+    | catchOn event (Nothing, SDL.KeycodeEscape,  SDL.Pressed) = QuitSave
+    | catchOn event (Nothing, SDL.KeycodeUp,    SDL.Pressed) = SaveChoice_Up
+    | catchOn event (Nothing, SDL.KeycodeDown,  SDL.Pressed) = SaveChoice_Down
+    | 32 <= v && v <= 122 && SDL.keyboardEventKeyMotion event == SDL.Pressed = SaveName_Input $ fromJust $ lookup v sdlKeyCodeTable
+    | otherwise = ContinueSave
+            where v = SDLN.toNumber (SDL.keysymKeycode (SDL.keyboardEventKeysym event))
+
+sdlKeyCodeTable = zip ([32..64]++[91..122]) " !\"#$%&'()*+,-./0123456789:;<=>?@[\\]^_`abcdefghijklmnopqrstuvwxyz"
 
 
 addNote :: Note -> MusicalScore -> MusicalScore
@@ -198,7 +287,7 @@ addNote n ms = ms&bars .~ (init (ms^.bars) ++ addNote' n (last $ ms^.bars))
 
 getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
-    | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeO,   SDL.Pressed) = OpenEvent
+    | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeO,   SDL.Pressed) = LoadEvent
     | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeS,   SDL.Pressed) = SaveEvent
     | catchOn event (Nothing,                       SDL.KeycodeQ,   SDL.Pressed) = Quit
     | catchOn event (Nothing,                       SDL.KeycodeB,   SDL.Pressed) = AddNote B

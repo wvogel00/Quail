@@ -132,10 +132,25 @@ data QuailEvent =
     | ResumeSound
     | MousePos Int Int
     | SaveEvent
-    | Save FilePath
-    | OpenEvent
-    | Open FilePath
+    | LoadEvent
     deriving (Eq, Show)
+
+data SaveEvent =
+    QuitSave
+    | Save
+    | SaveChoice_Up
+    | SaveChoice_Down
+    | SaveName_Input Char
+    | ContinueSave
+    deriving Eq
+
+data LoadEvent =
+    QuitLoad
+    | Load
+    | LoadChoice_Up
+    | LoadChoice_Down
+    | ContinueLoad
+    deriving Eq
 
 $(makeLenses ''MusicalScore)
 $(makeLenses ''Bar)
