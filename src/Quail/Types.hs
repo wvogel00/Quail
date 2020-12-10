@@ -202,7 +202,16 @@ data QuailEvent =
     | MousePos Int Int
     | SaveEvent
     | LoadEvent
+    | MetroEvent
     deriving (Eq, Show)
+
+data MetroEvent =
+    MetroContinue
+    | MetroQuit
+    | MetroReturn
+    | MetroDelete
+    | MetroInput Int
+    deriving Eq
 
 data SaveEvent =
     QuitSave

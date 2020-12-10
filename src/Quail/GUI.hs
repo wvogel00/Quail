@@ -32,6 +32,7 @@ gray = SDL.V4 128 128 128 255
 black = SDL.V4 0 0 0 255
 saveScreenColor = V4 200 200 200 100
 loadScreenColor = V4 220 180 180 100
+metroScreenColor = V4 220 220 220 100
 
 withSDL :: (MonadIO m) => m a -> m ()
 withSDL op = do
@@ -108,7 +109,7 @@ drawText r fontsize (x,y) text = do
     textTexture <- SDL.createTextureFromSurface r textSurface
     Font.free font
     SDL.copyEx r textTexture
-        (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 (fromIntegral width) (fromIntegral height)))
+        (Just $ SDL.Rectangle (SDL.P $ SDL.V2 0 0) (SDL.V2 (fromIntegral w) (fromIntegral h)))
         (Just $ SDL.Rectangle (SDL.P $ SDL.V2 x y) (SDL.V2 (fromIntegral w) (fromIntegral h)))
         0
         Nothing
@@ -201,8 +202,42 @@ dealEvent ev (audio,sound) r ms = case ev of
             Just loadms -> return loadms
             Nothing -> return ms
     SaveEvent -> saveLoop r [] >> return ms
+    MetroEvent -> do
+        m <- metroLoop r (ms^.metro) 
+        return $ ms&metro .~ m
     _ -> return ms
 
+
+metroLoop r (Metronome m) = metroLoop' r m
+    where
+    metroLoop' r now = do
+        event <- getMetroEvent <$> SDL.pollEvent
+        SDL.rendererDrawColor r $= metroScreenColor
+        SDL.clear r
+        drawText r 16 (30,10) $ pack.show $ now
+        SDL.present r
+        case event of
+            MetroQuit -> return (Metronome m)
+            MetroReturn -> return.Metronome $ if now <= 0 then m else now
+            MetroDelete -> metroLoop' r (div now 10)
+            MetroInput v -> metroLoop' r (now*10 + v)
+            MetroContinue ->  metroLoop' r now
+
+getMetroEvent :: Maybe SDL.Event -> MetroEvent
+getMetroEvent Nothing = MetroContinue
+getMetroEvent (Just e) =case SDL.eventPayload e of
+    SDL.KeyboardEvent keyEvent -> getMetroEventType keyEvent
+    ev -> MetroContinue
+
+getMetroEventType :: SDL.KeyboardEventData -> MetroEvent
+getMetroEventType event
+    | catchOn event (Nothing, SDL.KeycodeEscape,  SDL.Pressed) = MetroQuit
+    | catchOn event (Nothing, SDL.KeycodeReturn,  SDL.Pressed) = MetroReturn
+    | catchOn event (Nothing, SDL.KeycodeBackspace,  SDL.Pressed) = MetroDelete
+    | v /= Nothing && isPressed event = MetroInput $ fromJust v
+    | otherwise = MetroContinue
+    where
+        v = lookup (getKeyCode event) sdlNumCodeTable
 
 loadLoop r = do
     event <- getLoadEvent <$> SDL.pollEvent
@@ -271,11 +306,14 @@ getSaveEventType event
     | catchOn event (Nothing, SDL.KeycodeEscape,  SDL.Pressed) = QuitSave
     | catchOn event (Nothing, SDL.KeycodeUp,    SDL.Pressed) = SaveChoice_Up
     | catchOn event (Nothing, SDL.KeycodeDown,  SDL.Pressed) = SaveChoice_Down
-    | 32 <= v && v <= 122 && SDL.keyboardEventKeyMotion event == SDL.Pressed = SaveName_Input $ fromJust $ lookup v sdlKeyCodeTable
+    | v /= Nothing && isPressed event = SaveName_Input $ fromJust v
     | otherwise = ContinueSave
-            where v = SDLN.toNumber (SDL.keysymKeycode (SDL.keyboardEventKeysym event))
+            where v = lookup (getKeyCode event) sdlKeyCodeTable
 
+isPressed = (==) SDL.Pressed . SDL.keyboardEventKeyMotion
+getKeyCode = SDLN.toNumber . SDL.keysymKeycode . SDL.keyboardEventKeysym
 sdlKeyCodeTable = zip ([32..64]++[91..122]) " !\"#$%&'()*+,-./0123456789:;<=>?@[\\]^_`abcdefghijklmnopqrstuvwxyz"
+sdlNumCodeTable = zip ([48..57]) [0..]
 
 
 addNote :: Note -> MusicalScore -> MusicalScore
@@ -291,6 +329,7 @@ getEventType :: SDL.KeyboardEventData -> QuailEvent
 getEventType event
     | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeO,   SDL.Pressed) = LoadEvent
     | catchOn event (Just SDL.keyModifierLeftGUI  , SDL.KeycodeS,   SDL.Pressed) = SaveEvent
+    | catchOn event (Nothing,                       SDL.KeycodeM,   SDL.Pressed) = MetroEvent
     | catchOn event (Nothing,                       SDL.KeycodeQ,   SDL.Pressed) = Quit
     | catchOn event (Nothing,                       SDL.KeycodeB,   SDL.Pressed) = AddNote B
     | catchOn event (Just SDL.keyModifierLeftShift, SDL.KeycodeA,   SDL.Pressed) = AddNote AS
