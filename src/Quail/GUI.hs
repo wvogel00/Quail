@@ -14,7 +14,8 @@ import Control.Monad (void, unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Extra (whileM)
 import Data.Int (Int16)
-import Data.Text (Text, pack)
+import Data.Text (Text)
+import qualified Data.Text as T (null,pack)
 import Data.List (lookup)
 import Data.Maybe (fromJust)
 import Data.IORef (newIORef, writeIORef, readIORef, IORef)
@@ -27,12 +28,18 @@ import Debug.Trace (trace)
 
 (width, height) = (600,480)
 fontpath = "ttf/Raleway-Regular.ttf"
+mspath = "scores/"
 
 gray = SDL.V4 128 128 128 255
 black = SDL.V4 0 0 0 255
+red = SDL.V4 255 0 80 255
 saveScreenColor = V4 200 200 200 100
 loadScreenColor = V4 220 180 180 100
 metroScreenColor = V4 220 220 220 100
+
+metroFontSize = 16
+textFontSize = 20
+barLinePoses = []
 
 withSDL :: (MonadIO m) => m a -> m ()
 withSDL op = do
@@ -93,7 +100,7 @@ renderLoop audio r ts mscore = do
     drawMusicalScore r ts mscore'
 
     -- テンポの描画
-    drawText r 16 (30,10) $ pack $ show (mscore^.metro)
+    drawText r black metroFontSize (30,10) $ T.pack $ show (mscore^.metro)
 
     -- 更新
     SDL.destroyTexture staff
@@ -102,9 +109,9 @@ renderLoop audio r ts mscore = do
     unless (event == Quit) $ renderLoop audio r ts mscore'
 
 
-drawText r fontsize (x,y) text = do
+drawText r color fontsize (x,y) text = unless (T.null text) $ do
     font <- Font.load fontpath fontsize
-    textSurface <- Font.solid font black text
+    textSurface <- Font.solid font color text
     (w,h) <- Font.size font text
     textTexture <- SDL.createTextureFromSurface r textSurface
     Font.free font
@@ -201,7 +208,7 @@ dealEvent ev (audio,sound) r ms = case ev of
         case loadResult of
             Just loadms -> return loadms
             Nothing -> return ms
-    SaveEvent -> saveLoop r [] >> return ms
+    SaveEvent -> saveLoop r ms >> return ms
     MetroEvent -> do
         m <- metroLoop r (ms^.metro) 
         return $ ms&metro .~ m
@@ -214,7 +221,7 @@ metroLoop r (Metronome m) = metroLoop' r m
         event <- getMetroEvent <$> SDL.pollEvent
         SDL.rendererDrawColor r $= metroScreenColor
         SDL.clear r
-        drawText r 16 (30,10) $ pack.show $ now
+        drawText r black metroFontSize (30,10) $ T.pack.show $ now
         SDL.present r
         case event of
             MetroQuit -> return (Metronome m)
@@ -239,24 +246,31 @@ getMetroEventType event
     where
         v = lookup (getKeyCode event) sdlNumCodeTable
 
-loadLoop r = do
-    event <- getLoadEvent <$> SDL.pollEvent
-    SDL.rendererDrawColor r $= loadScreenColor
-    SDL.clear r
-    drawText r 20 (100,40) "choose the filename:"
-    files <- filter isQuailFile <$> getDirectoryContents "scores"
-    foldlM_ (drawTextList r 20) (100,65) $ map pack files
-    SDL.present r
-    case event of
-        QuitLoad -> return Nothing
-        Load -> return.Just $ initMusicalScore -- 未実装
-        LoadChoice_Up -> print "up" >> loadLoop r
-        LoadChoice_Down -> print "down" >> loadLoop r
-        ContinueLoad ->  loadLoop r
+loadLoop r = loadLoop' r 0 
+    where
+    loadLoop' r i = do
+        event <- getLoadEvent <$> SDL.pollEvent
+        SDL.rendererDrawColor r $= loadScreenColor
+        SDL.clear r
+        drawText r black textFontSize (100,40) "choose the filename:"
+        files <- filter isQuailFile <$> getDirectoryContents "scores"
+        drawTextList r black textFontSize (100,65) $ filter ((/=i).fst) . zip [0..] $ map T.pack files
+        drawTextList r red textFontSize (100,65) [(i, T.pack $ files!!i)]
+        SDL.present r
+        case event of
+            QuitLoad -> return Nothing
+            Load -> do
+                result <- readScore (mspath++files!!i)
+                case result of
+                    Left err -> print ("cannot open file as" ++ err) >> return Nothing
+                    Right ms -> return $ Just ms
+            LoadChoice_Up -> loadLoop' r (max 0 (i-1))
+            LoadChoice_Down -> loadLoop' r (min (i+1) (length files-1))
+            ContinueLoad ->  loadLoop' r i
 
-drawTextList r fontsize (x,y) t = do
-    drawText r fontsize (x,y) t
-    return (x,y+fromIntegral fontsize+5)
+drawTextList r color fontsize (x,y) its = mapM_ f its
+    where
+    f (i,t) = drawText r color fontsize (x,y+(fromIntegral fontsize+5)*fromIntegral i) t
 
 
 getLoadEvent :: Maybe SDL.Event -> LoadEvent
@@ -275,23 +289,26 @@ getLoadEventType event
     | otherwise = ContinueLoad
 
 
-saveLoop r filename = do
-    event <- getSaveEvent <$> SDL.pollEvent
-    SDL.rendererDrawColor r $= saveScreenColor
-    SDL.clear r
-    drawText r 20 (100,40) "choose or type the filename:"
-    unless (null filename) $ drawText r 20 (100,65) $ pack filename
-    SDL.present r
-    case event of
-        QuitSave -> return ()
-        Save -> do
-            print $ "save file as" ++ filename ++ " (not implemented)"
-            saveLoop r filename
-        SaveName_Input c -> saveLoop r (filename++[c])
-        SaveChoice_Up -> print "up" >> saveLoop r filename
-        SaveChoice_Down -> print "down" >> saveLoop r filename
-        ContinueSave -> saveLoop r filename
-
+saveLoop r ms = saveLoop' r 0 ""
+    where
+    saveLoop' r i input = do
+        event <- getSaveEvent <$> SDL.pollEvent
+        SDL.rendererDrawColor r $= saveScreenColor
+        SDL.clear r
+        files' <- filter isQuailFile <$> getDirectoryContents "scores"
+        drawText r black textFontSize (100,40) "choose or type the filename:"
+        let files = input : files'
+        drawTextList r black textFontSize (100,65) $ filter ((/= i).fst) . zip [0..] $ map T.pack files
+        drawTextList r red textFontSize (100,65) [(i, T.pack $ files!!i)]
+        SDL.present r
+        case event of
+            QuitSave -> return ()
+            Save -> save (files!!i) ms
+            SaveName_Input c ->saveLoop' r i $ if i == 0 then input++[c] else input
+            SaveChoice_Up -> saveLoop' r (max (i-1) 0) input
+            SaveChoice_Down -> saveLoop' r (min (i+1) (length files)) input
+            ContinueSave -> saveLoop' r i input
+    save file = unless (null file) . writeScore (mspath ++ addQuailExtension file)
 
 getSaveEvent :: Maybe SDL.Event -> SaveEvent
 getSaveEvent Nothing = ContinueSave

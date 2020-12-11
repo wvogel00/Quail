@@ -134,5 +134,8 @@ safeinit :: [a] -> Maybe [a]
 safeinit [] = Nothing
 safeinit xs = Just $ init xs
 
-isQuailFile :: String -> Bool
-isQuailFile file = takeExtension file == ".quail"
+isQuailFile :: FilePath -> Bool
+isQuailFile = (==) ".quail" . takeExtension
+
+addQuailExtension :: FilePath -> FilePath
+addQuailExtension file = if isQuailFile file then file else file++".quail"
